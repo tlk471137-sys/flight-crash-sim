@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber-Glide 3D: Next-Gen Flight Simulator</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; }
+        body { background: #060814; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
+        
+        #game-container { width: 1000px; background: #0b0f19; border-radius: 16px; border: 1px solid #1f294d; box-shadow: 0 20px 50px rgba(0,0,0,0.8); padding: 24px; position: relative; }
+        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1e294b; padding-bottom: 16px; margin-bottom: 16px; }
+        h1 { font-size: 26px; font-weight: 800; background: linear-gradient(45deg, #00f2fe, #4facfe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 1px; }
+        .stats-bar { display: flex; gap: 24px; font-weight: bold; background: #03050a; padding: 12px 20px; border-radius: 8px; border: 1px solid #131a35; font-family: monospace; font-size: 14px; }
+        .stat-val { color: #00ffaa; text-shadow: 0 0 10px rgba(0,255,170,0.3); }
+
+        #screen-menu, #screen-market, #screen-flight { width: 100%; }
+        .hidden { display: none !important; }
+
+        /* UI Controls */
+        .btn { background: linear-gradient(135deg, #0052d4, #4364f7, #6fb1fc); color: white; border: none; padding: 14px 28px; font-size: 15px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.3s; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(67, 100, 247, 0.4); }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(67, 100, 247, 0.6); }
+        .btn-danger { background: linear-gradient(135deg, #cb2d3e, #ef4444); box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); }
+        .btn-danger:hover { box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6); }
+        .btn-secondary { background: #1f2937; border: 1px solid #374151; box-shadow: none; }
+        .btn-secondary:hover { background: #2d3748; box-shadow: none; }
+        
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-top: 20px; }
+        .card { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; transition: 0.3s; }
+        .card:hover { border-color: #3b82f6; background: #131e35; }
+        .card h3 { margin-bottom: 8px; color: #f1f5f9; font-size: 18px; }
+        .card p { font-size: 14px; color: #94a3b8; margin-bottom: 16px; line-height: 1.5; }
+
+        /* Flight Stage */
+        #view-wrapper { position: relative; width: 100%; height: 480px; border-radius: 12px; overflow: hidden; border: 1px solid #1e294b; background: #000; }
+        
+        .flight-hud { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; background: #03050a; padding: 16px; border-radius: 12px; border: 1px solid #131a35; font-family: monospace; }
+        .hud-item { border-left: 3px solid #00f2fe; padding-left: 12px; }
+        .hud-item.warn { border-left-color: #ef4444; }
+        .hud-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+        .hud-val { font-size: 20px; font-weight: bold; color: #f8fafc; margin-top: 2px; }
+
+        .controls-hint { margin-top: 16px; background: #0f172a; padding: 14px; border-radius: 8px; text-align: center; color: #94a3b8; font-size: 14px; border: 1px dashed #334155; }
+        
+        /* Modal Overlay */
+        #crash-modal { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(3, 5, 10, 0.9); display: flex; align-items: center; justify-content: center; border-radius: 16px; z-index: 100; padding: 40px; text-align: center; backdrop-filter: blur(4px); }
+        .modal-content { max-width: 550px; background: #0f172a; border: 1px solid #ef4444; padding: 36px; border-radius: 16px; box-shadow: 0 0 30px rgba(239, 68, 68, 0.25); }
+        .modal-content h2 { color: #ef4444; font-size: 32px; margin-bottom: 16px; font-weight: 800; letter-spacing: 1px; }
+        .modal-content p { color: #cbd5e1; margin-bottom: 24px; line-height: 1.6; font-size: 15px; }
+    </style>
+    <!-- Include Three.js via absolute CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+<div id="game-container">
+    <header>
+        <h1>Cyber-Glide 3D</h1>
+        <div class="stats-bar">
+            <div>VAULT CAPITAL: <span id="global-money" class="stat-val">$150,000</span></div>
+            <div>ACTIVE DESIGN: <span id="global-plane" style="color:#00f2fe;">Cessna Horizon</span></div>
+        </div>
+    </header>
+
+    <!-- MAIN MENU -->
+    <div id="screen-menu">
+        <div class="grid">
+            <div class="card">
+                <h3>Launch Flight Coordinates</h3>
+                <p>Deploy your multi-axis dynamic flight machine into a cybernetic matrix vector pipeline. Avoid vertical architectures or induce operational test failure states.</p>
+                <button class="btn" onclick="startFlight()">Initialize Flight</button>
+            </div>
+            <div class="card">
+                <h3>Aero Procurement Market</h3>
+                <p>Expand your virtual hangar assets with heavier mass vessels, extreme velocity interceptors, or commercial cyber-jumbos.</p>
+                <button class="btn btn-secondary" onclick="showScreen('market')">Browse Designs</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MARKETPLACE -->
+    <div id="screen-market" class="hidden">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h2>Vessel Blueprints Inventory</h2>
+            <button class="btn btn-secondary" onclick="showScreen('menu')">Return to Command</button>
+        </div>
+        <div class="grid" id="market-grid"></div>
+    </div>
+
+    <!-- FLIGHT ENVIRONMENT -->
+    <div id="screen-flight" class="hidden">
+        <div id="view-wrapper"></div>
+        
+        <div class="flight-hud">
+            <div class="hud-item"><div class="hud-label">Altitude Vector</div><div class="hud-val" id="hud-alt">0 m</div></div>
+            <div class="hud-item"><div class="hud-label">Kinetic Airspeed</div><div class="hud-val" id="hud-speed">0 km/h</div></div>
+            <div class="hud-item"><div class="hud-label">Roll Attitude</div><div class="hud-val" id="hud-roll">0°</div></div>
+            <div class="hud-item" id="hud-engine-box"><div class="hud-label">Reactor Core Status</div><div class="hud-val" id="hud-engine">100%</div></div>
+        </div>
+
+        <div class="controls-hint">
+            ⌨️ <strong>Manual Steering Geometry Matrix:</strong> 
+            Press <strong>[W] / [S]</strong> to Pitch Nose Down / Up | 
+            Press <strong>[A] / [D]</strong> to Bank and Roll Left / Right | 
+            Press <strong>[F]</strong> to Terminate Reactor Core
+        </div>
+        
+        <div style="margin-top: 16px; display: flex; gap: 16px;">
+            <button class="btn btn-danger" onclick="triggerEngineFailure()">Kill Propulsion Core [F]</button>
+            <button class="btn btn-secondary" onclick="abortFlight()">Abort Operational Simulation</button>
+        </div>
+    </div>
+
+    <!-- CRASH REPORT MODAL -->
+    <div id="crash-modal" class="hidden">
+        <div class="modal-content">
+            <h2 id="modal-title">Dynamic Deconstruction Matrix</h2>
+            <p id="modal-desc">Analyzing telemetry records...</p>
+            <div style="font-size: 22px; font-weight: bold; margin-bottom: 24px; color: #00ffaa;">
+                Insurance Salvage Payout: <span id="modal-payout">$0</span>
+            </div>
+            <button class="btn" onclick="closeCrashModal()">Recycle Structural Assembly</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- DATABASE ---
+    const FLEET = {
+        cessna: { id: 'cessna', name: "Cessna Horizon", price: 0, weight: 1200, maxSpeed: 240, color: 0x00f2fe, owned: true },
+        boeing: { id: 'boeing', name: "NeoAirliner 77-X", price: 90000, weight: 85000, maxSpeed: 880, color: 0x4facfe, owned: false },
+        raptor: { id: 'raptor', name: "F-22 Cyber-Raptor", price: 210000, weight: 21000, maxSpeed: 2500, color: 0xff007f, owned: false },
+        a380:   { id: 'a380',   name: "Titan Megastructure", price: 400000, weight: 580000, maxSpeed: 920, color: 0xbd00ff, owned: false }
+    };
+
+    // --- SYSTEMS CONFIG ---
+    let userMoney = 150000;
+    let activePlane = FLEET.cessna;
+    let animationId = null;
+
+    // WebGL Context Vectors
+    let scene, camera, renderer;
+    let planeMesh, buildings = [], particles = [];
+    
+    // Flight Math Data Structs
+    let planePos = { x: 0, y: 300, z: 0 };
+    let speed = 0, targetPitch = 0, targetRoll = 0;
+    let currentPitch = 0, currentRoll = 0;
+    let engineHealth = 100, engineFailed = false;
+    let worldDistanceTraveled = 0;
+
+    // Controls state dictionary
+    let keys = {};
+    window.addEventListener('keydown', e => { 
+        keys[e.key.toLowerCase()] = true; 
+        if(e.key.toLowerCase() === 'f') triggerEngineFailure(); 
+    });
+    window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+    function showScreen(screenId) {
+        document.getElementById('screen-menu').classList.add('hidden');
+        document.getElementById('screen-market').classList.add('hidden');
+        document.getElementById('screen-flight').classList.add('hidden');
+        document.getElementById('screen-' + screenId).classList.remove('hidden');
+        if(screenId === 'market') renderMarket();
+    }
+
+    function updateGlobalUI() {
+        document.getElementById('global-money').innerText = `$${userMoney.toLocaleString()}`;
+        document.getElementById('global-plane').innerText = activePlane.name;
+    }
+
+    function renderMarket() {
+        const grid = document.getElementById('market-grid');
+        grid.innerHTML = '';
+        Object.values(FLEET).forEach(p => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            let btnHTML = p.owned 
+                ? `<button class="btn ${activePlane.id === p.id ? 'btn-secondary' : ''}" ${activePlane.id === p.id ? 'disabled' : `onclick="equipPlane('${p.id}')"`}>${activePlane.id === p.id ? 'Equipped' : 'Deploy Design'}</button>`
+                : `<button class="btn" onclick="buyPlane('${p.id}')">Purchase Design: $${p.price.toLocaleString()}</button>`;
+
+            card.innerHTML = `
+                <div>
+                    <h3>${p.name}</h3>
+                    <p>Mass Frame Ratio: ${p.weight.toLocaleString()} kg<br>Max Velocity Velocity: ${p.maxSpeed} km/h</p>
+                </div>
+                ${btnHTML}
+            `;
+            grid.appendChild(card);
+        });
+    }
+
+    function buyPlane(id) {
+        let p = FLEET[id];
+        if (userMoney >= p.price) {
+            userMoney -= p.price; p.owned = true; activePlane = p;
+            updateGlobalUI(); renderMarket();
+        } else { alert("Insufficient operational capital inside your vault reservoir!"); }
+    }
+
+    function equipPlane(id) { activePlane = FLEET[id]; updateGlobalUI(); renderMarket(); }
+
+    // --- 3D ENGINE LIFECYCLE ---
+    function init3D() {
+        const container = document.getElementById('view-wrapper');
+        container.innerHTML = ''; // Wipe past instances
+        
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x03050a);
+        scene.fog = new THREE.FogExp2(0x03050a, 0.0015);
+
+        camera = new THREE.PerspectiveCamera(65, container.clientWidth / container.clientHeight, 1, 4000);
+        
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        // Illuminations
+        const ambientLight = new THREE.AmbientLight(0x1a243d);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(200, 500, 200);
+        scene.add(directionalLight);
+
+        // Floor Matrix Grid
+        const gridHelper = new THREE.GridHelper(10000, 100, 0x1f294d, 0x0f172a);
+        gridHelper.position.y = 0;
+        scene.add(gridHelper);
+
+        // Build Airframe mesh procedural architecture
+        buildAircraftMesh();
+
+        // Populate baseline building array
+        buildings = [];
+        for (let i = 0; i < 40; i++) { spawnSkyscraper(Math.random() * 2000 - 1000, Math.random() * -2000 - 400); }
+    }
+
+    function buildAircraftMesh() {
+        const planeGroup = new THREE.Group();
+
+        // Fuselage cylinder mesh
+        const fuseGeo = new THREE.CylinderGeometry(3, 4, 34, 8);
+        fuseGeo.rotateX(Math.PI / 2);
+        const fuseMat = new THREE.MeshPhongMaterial({ color: activePlane.color, specular: 0xffffff, shininess: 30 });
+        const fuselage = new THREE.Mesh(fuseGeo, fuseMat);
+        planeGroup.add(fuselage);
+
+        // Main Wings structure
+        const wingGeo = new THREE.BoxGeometry(45, 1, 8);
+        const wing = new THREE.Mesh(wingGeo, fuseMat);
+        wing.position.set(0, 0, 2);
+        planeGroup.add(wing);
+
+        // Stabilizer unit
+        const tailGeo = new THREE.BoxGeometry(1, 10, 6);
+        const tail = new THREE.Mesh(tailGeo, fuseMat);
+        tail.position.set(0, 5, -13);
+        planeGroup.add(tail);
+
+        planeMesh = planeGroup;
+        scene.add(planeMesh);
+    }
+
+    function spawnSkyscraper(x, z) {
+        const w = Math.random() * 40 + 30;
+        const h = Math.random() * 250 + 80;
+        const d = Math.random() * 40 + 30;
+
+        const geo = new THREE.BoxGeometry(w, h, d);
+        
+        // Cyberpunk wireframe architecture mesh textures
+        const mat = new THREE.MeshPhongMaterial({
+            color: 0x090d16,
+            emissive: 0x111827,
+            specular: 0x1f293d
+        });
+        
+        const building = new THREE.Mesh(geo, mat);
+        building.position.set(x, h/2, z);
+        scene.add(building);
+
+        // Neon Framing lines accents
+        const edges = new THREE.EdgesGeometry(geo);
+        const lineMat = new THREE.LineBasicMaterial({ 
+            color: Math.random() > 0.5 ? 0x00f2fe : 0xff007f,
+            linewidth: 1
+        });
+        const wireframe = new THREE.LineSegments(edges, lineMat);
+        building.add(wireframe);
+
+        // Cache parameters inside internal collection arrays
+        building.userData = { w: w, h: h, d: d };
+        buildings.push(building);
+    }
+
+    function startFlight() {
+        showScreen('flight');
+        init3D();
+
+        // Reset flight attributes telemetry variables
+        planePos = { x: 0, y: 280, z: 0 };
+        speed = activePlane.maxSpeed * 0.65;
+        targetPitch = 0; targetRoll = 0;
+        currentPitch = 0; currentRoll = 0;
+        engineHealth = 100; engineFailed = false;
+        worldDistanceTraveled = 0;
+        particles = [];
+
+        document.getElementById('hud-engine-box').style.borderLeftColor = "#00f2fe";
+
+        if(animationId) cancelAnimationFrame(animationId);
+        animationId = requestAnimationFrame(gameLoopUpdate);
+    }
+
+    function triggerEngineFailure() {
+        if(!engineFailed) {
+            engineFailed = true; engineHealth = 0;
+            document.getElementById('hud-engine-box').style.borderLeftColor = "#ef4444";
+        }
+    }
+
+    function abortFlight() { cancelAnimationFrame(animationId); showScreen('menu'); }
+
+    // --- CORE GAME LOOP ---
+    function gameLoopUpdate() {
+        // Read keystrokes controls configuration arrays
+        if (keys['w'] || keys['arrowup']) targetPitch = -0.4;
+        else if (keys['s'] || keys['arrowdown']) targetPitch = 0.4;
+        else targetPitch = 0;
+
+        if (keys['a'] || keys['arrowleft']) targetRoll = -0.6;
+        else if (keys['d'] || keys['arrowright']) targetRoll = 0.6;
+        else targetRoll = 0;
+
+        // Smooth structural dampening transitions
+        currentPitch += (targetPitch - currentPitch) * 0.1;
+        currentRoll += (targetRoll - currentRoll) * 0.1;
+
+        // Dynamic System Reaction Framework
+        if (engineFailed) {
+            speed = Math.max(50, speed - (activePlane.weight / 16000));
+            currentPitch = Math.min(currentPitch, -0.15); // Constant nose descent angle
+            
+            // Generate smoke physics calculations
+            if (Math.random() > 0.3) spawnSmokeParticle();
+        }
+
+        // Apply Flight Physics vectors
+        const velocityMPS = (speed * 1000) / 3600;
+        planePos.y += Math.sin(currentPitch) * (velocityMPS * 0.05) * 8;
+        planePos.x += Math.sin(currentRoll) * (velocityMPS * 0.05) * 4;
+        worldDistanceTraveled += velocityMPS * 0.016; 
+
+        // Glide angle energy maintenance bounds
+        if (currentPitch < 0) { speed += Math.abs(currentPitch) * 0.5; }
+        else if (currentPitch > 0) {
+            speed -= currentPitch * 0.8;
+            if(speed < 60) speed = 60; // Stall stabilization minimum
+        }
+
+        // Keep plane within side coordinates boundaries
+        if (planePos.x < -480) planePos.x = -480;
+        if (planePos.x > 480) planePos.x = 480;
+
+        // Update active structural mesh transform configurations
+        planeMesh.position.set(planePos.x, planePos.y, planePos.z);
+        planeMesh.rotation.set(currentPitch, 0, -currentRoll);
+
+        // Camera positioning geometry updates (Cinematic trail tracking)
+        camera.position.set(planePos.x * 0.8, planePos.y + 25, planePos.z + 75);
+        camera.lookAt(new THREE.Vector3(planePos.x, planePos.y - 5, planePos.z - 150));
+
+        // Manage procedural scenery pipelines
+        updateSceneryStream();
+        updateParticles();
+
+        // Update HUD Metrics readouts display
+        document.getElementById('hud-alt').innerText = `${Math.max(0, Math.round(planePos.y))} m`;
+        document.getElementById('hud-speed').innerText = `${Math.round(speed)} km/h`;
+        document.getElementById('hud-roll').innerText = `${Math.round(currentRoll * (180/Math.PI))}°`;
+        document.getElementById('hud-engine').innerText = `${engineHealth}%`;
+
+        // Check Structural Collision limits thresholds
+        if (checkCollisionDetected()) {
+            calculateImpactMetrics();
+        } else {
+            renderer.render(scene, camera);
+            animationId = requestAnimationFrame(gameLoopUpdate);
+        }
+    }
+
+    function spawnSmokeParticle() {
+        const geo = new THREE.BoxGeometry(2, 2, 2);
+        const mat = new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.8 });
+        const p = new THREE.Mesh(geo, mat);
+        p.position.set(planePos.x + (Math.random()*4-2), planePos.y + (Math.random()*2-1), planePos.z + 15);
+        scene.add(p);
+        particles.push({ mesh: p, age: 0, maxAge: 30 + Math.random()*20 });
+    }
+
+    function updateParticles() {
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.age++;
+            p.mesh.position.z += 2; // Drift behind movement pipeline
+            p.mesh.scale.multiplyScalar(1.04);
+            p.mesh.material.opacity = 1 - (p.age / p.maxAge);
+            if (p.age >= p.maxAge) {
+                scene.remove(p.mesh);
+                particles.splice(i, 1);
+            }
+        }
+    }
+
+    function updateSceneryStream() {
+        const scrollVelocity = (speed * 1000) / 3600 * 0.05 * 5;
+        
+        buildings.forEach(b => {
+            b.position.z += scrollVelocity; // Push buildings down visual view window matrix
+            
+            // Recycle building to horizon if past viewport visibility limits
+            if (b.position.z > 200) {
+                b.position.z = -2000 - (Math.random() * 300);
+                b.position.x = Math.random() * 1600 - 800;
+                const newHeight = Math.random() * 250 + 80;
+                b.geometry.dispose();
+                b.geometry = new THREE.BoxGeometry(b.userData.w, newHeight, b.userData.d);
+                b.position.y = newHeight / 2;
+            }
+        });
+    }
+
+    function checkCollisionDetected() {
+        // Floor level structural impact check
+        if (planePos.y <= 4) return true;
+
+        // Bounding calculation box intersections loops
+        for (let i = 0; i < buildings.length; i++) {
+            let b = buildings[i];
+            
+            // Rough box intersection calculations
+            if (Math.abs(b.position.z - planePos.z) < (b.userData.d / 2 + 6)) {
+                if (Math.abs(b.position.x - planePos.x) < (b.userData.w / 2 + 18)) {
+                    if (planePos.y < b.userData.h) {
+                        return true; // Structural collision validated
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    function calculateImpactMetrics() {
+        cancelAnimationFrame(animationId);
+        
+        let velocityMPS = (speed * 1000) / 3600;
+        let kineticEnergyIndex = 0.5 * activePlane.weight * Math.pow(velocityMPS, 2);
+        let absoluteCrashSeverity = (kineticEnergyIndex * (Math.abs(currentPitch) + 0.1)) / 100000;
+
+        let title = "", desc = "", payout = 0;
+
+        if (absoluteCrashSeverity > 900) {
+            title = "🔴 Catastrophic Core Fracture";
+            desc = `The ${activePlane.name} impacted building matrices at a critical speed profile of ${Math.round(speed)} km/h. Structural components registered atomic-level fragmentation.`;
+            payout = Math.floor(15000 + Math.random() * 10000);
+        } else if (absoluteCrashSeverity > 300) {
+            title = "🟠 Major Hull Fragmentation";
+            desc = `Severe kinetic collision load. Forward structural assembly decoupled instantly, distributing airframe composite mass clusters across the vector grid pipeline corridors.`;
+            payout = Math.floor(40000 + Math.random() * 20000);
+        } else if (absoluteCrashSeverity > 50) {
+            title = "🟡 Hard Kinetic Touchdown";
+            desc = `High fuselage structural yield stress encountered. Landing frame mechanics failed completely due to dynamic impact loads against surrounding environment architectures.`;
+            payout = Math.floor(75000 + Math.random() * 25000);
+        } else {
+            title = "🟢 Sub-Optimal Emergency Ditching";
+            desc = `Incredible manual stabilization alignment before interface contact. Hull composite integration sustained minimal displacement degradation logs.`;
+            payout = Math.floor(130000 + Math.random() * 40000);
+        }
+
+        userMoney += payout;
+        updateGlobalUI();
+
+        document.getElementById('modal-title').innerText = title;
+        document.getElementById('modal-desc').innerText = desc;
+        document.getElementById('modal-payout').innerText = `$${payout.toLocaleString()}`;
+        document.getElementById('crash-modal').classList.remove('hidden');
+    }
+
+    function closeCrashModal() {
+        document.getElementById('crash-modal').classList.add('hidden');
+        showScreen('menu');
+    }
+
+    // INITIALIZATION RUNTIME START
+    updateGlobalUI();
+</script>
+</body>
+</html>
